@@ -274,7 +274,7 @@ new_connection(Transport, Host, Port, Options) ->
     process_flag(trap_exit, true),
     gen_server:start_link(?MODULE, {Transport, Host, Port, Options, self()}, []).
 
--spec close(connection()) -> ok.
+-spec close(pid()) -> ok.
 %% @doc Close (stop/clean up) the connection.
 close(Pid) ->
     gen_server:stop(Pid).
@@ -403,8 +403,8 @@ init({Transport0, Host, Port, Options, Owner}) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
--spec handle_call(term(), pid(), connection()) ->
-    {reply, term(), connection()}.
+-spec handle_call(term(), {pid(), term()}, connection()) ->
+                         {reply, term(), connection()}.
 %% @private
 handle_call(peercert, _From, #{transport := ssl, socket := Socket} = C) ->
     {reply, ssl:peercert(Socket), C};
@@ -424,14 +424,10 @@ handle_call({new_stream, _}, _From,
     {reply, {error, no_more_streams_allowed_by_server}, C};
 handle_call({new_stream, Options}, From, #{streams := Streams,
                                            stream_count := Count} = C) ->
-    case new_stream(C, From, Options) of
-        {ok, #{id := Id} = Stream} -> 
-            {reply, {ok, Id}, C#{last_stream => Id,
-                                 streams => [{Id, Stream} | Streams],
-                                 stream_count => Count + 1}};
-        {error, _} = Error ->
-            {reply, Error, C}
-    end;
+    {ok, #{id := Id} = Stream} = new_stream(C, From, Options),
+    {reply, {ok, Id}, C#{last_stream => Id,
+                         streams => [{Id, Stream} | Streams],
+                         stream_count => Count + 1}};
 
 %% HEADERS frames can be sent on a stream in the "idle", "reserved (local)",
 %% "open", or "half-closed (remote)" state.
