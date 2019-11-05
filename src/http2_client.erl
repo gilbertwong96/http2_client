@@ -1157,7 +1157,9 @@ do_send_data2(#{server_settings := #{max_frame_size := MaxFrameSize},
         case {State, EndStream} of
             {_, false}  ->
                 {State, []};
-            {half_closed_remote, true} ->
+            {Closed, true}
+              when Closed =:= half_closed_remote;
+                   Closed =:= closed ->
                 {closed, [?END_STREAM]};
             {open, true} ->
                 {half_closed_local, [?END_STREAM]}
